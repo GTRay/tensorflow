@@ -147,7 +147,7 @@ def tf_copts():
       "-Iexternal/gemmlowp",
       "-Wno-sign-compare",
       "-fno-exceptions",
-  ] + if_cuda(["-DGOOGLE_CUDA=1"]) + if_mkl(["-DINTEL_MKL=1"]) + if_android_arm(
+  ] + if_cuda(["-DGOOGLE_CUDA=1"]) + if_mkl(["-DINTEL_MKL=1", "-fopenmp",]) + if_android_arm(
       ["-mfpu=neon"]) + if_x86(["-msse3"]) + select({
           clean_dep("//tensorflow:android"): [
               "-std=c++11",
@@ -167,7 +167,7 @@ def tf_opts_nortti_if_android():
       "-fno-rtti",
       "-DGOOGLE_PROTOBUF_NO_RTTI",
       "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
-  ]) + if_android_x86(["-msse4.1"])
+  ])
 
 
 # LINT.ThenChange(//tensorflow/contrib/android/cmake/CMakeLists.txt)

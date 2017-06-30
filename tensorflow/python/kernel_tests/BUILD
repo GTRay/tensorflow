@@ -728,6 +728,18 @@ tf_py_test(
 )
 
 tf_py_test(
+    name = "sparse_slice_op_test",
+    size = "small",
+    srcs = ["sparse_slice_op_test.py"],
+    additional_deps = [
+        "//third_party/py/numpy",
+        "//tensorflow/python:client_testlib",
+        "//tensorflow/python:framework",
+        "//tensorflow/python:sparse_ops",
+    ],
+)
+
+tf_py_test(
     name = "sparse_to_dense_op_py_test",
     size = "small",
     srcs = ["sparse_to_dense_op_py_test.py"],
@@ -1578,7 +1590,7 @@ cuda_py_test(
 
 cuda_py_test(
     name = "random_ops_test",
-    size = "small",
+    size = "medium",
     srcs = ["random_ops_test.py"],
     additional_deps = [
         "//third_party/py/numpy",
@@ -2184,11 +2196,7 @@ cuda_py_test(
         "//tensorflow/python:math_ops",
         "//tensorflow/python:spectral_ops",
     ],
-    tags = [
-        "noasan",
-        "nomsan",
-        "notsan",  # http://b/62067589
-    ],
+    shard_count = 3,
 )
 
 cuda_py_test(
@@ -2386,7 +2394,6 @@ cuda_py_test(
         "//tensorflow/python:util",
         "//tensorflow/python:data_flow_ops",
     ],
-    tags = ["manual"],  # http://b/62429636
 )
 
 cuda_py_test(
@@ -2401,7 +2408,6 @@ cuda_py_test(
         "//tensorflow/python:util",
         "//tensorflow/python:data_flow_ops",
     ],
-    tags = ["manual"],  # http://b/62429636
 )
 
 cuda_py_test(
@@ -2485,6 +2491,7 @@ cuda_py_test(
         "//tensorflow/python:embedding_ops",
         "//tensorflow/python:framework",
         "//tensorflow/python:framework_for_generated_wrappers",
+        "//tensorflow/python:linalg_ops",
         "//tensorflow/python:math_ops",
         "//tensorflow/python:partitioned_variables",
         "//tensorflow/python:platform",

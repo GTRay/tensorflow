@@ -7,8 +7,6 @@ package(
 
 licenses(["notice"])  # Apache 2.0
 
-exports_files(["LICENSE"])
-
 cc_library(
     name = "batch_scheduler_hdrs",
     hdrs = ["batch_scheduler.h"],
@@ -27,6 +25,7 @@ cc_library(
 
 cc_test(
     name = "batch_scheduler_test",
+    size = "small",
     srcs = [
         "batch_scheduler_test.cc",
     ],
@@ -60,6 +59,7 @@ cc_library(
 
 cc_test(
     name = "shared_batch_scheduler_test",
+    size = "small",
     srcs = [
         "shared_batch_scheduler_test.cc",
     ],
@@ -83,6 +83,7 @@ cc_library(
 
 cc_test(
     name = "basic_batch_scheduler_test",
+    size = "small",
     srcs = [
         "basic_batch_scheduler_test.cc",
     ],

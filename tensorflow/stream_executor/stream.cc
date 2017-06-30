@@ -59,6 +59,10 @@ string ToVlogString(dnn::ActivationMode mode) {
   return dnn::ActivationModeString(mode);
 }
 
+string ToVlogString(const dnn::AlgorithmConfig &algo_config) {
+  return algo_config.ToString();
+}
+
 string ToVlogString(dnn::ElementwiseOperation op) {
   return dnn::ElementwiseOperationString(op);
 }
@@ -164,6 +168,19 @@ string ToVlogString(dnn::DepthToSpaceLayout depth_to_space_layout) {
       return "DepthToSpaceLayout::DepthHeightWidth";
   }
   return "unknown DepthToSpaceLayout";
+}
+
+string ToVlogString(dnn::DataType data_type) {
+  switch (data_type) {
+    case dnn::DataType::kFloat:
+      return "dnn::DataType::kFloat";
+    case dnn::DataType::kDouble:
+      return "dnn::DataType::kDouble";
+    case dnn::DataType::kHalf:
+      return "dnn::DataType::kHalf";
+    case dnn::DataType::kInt8:
+      return "dnn::DataType::kInt8";
+  }
 }
 
 // Used together with PARAM to VLOG calls made to the stream. Intended
@@ -469,7 +486,8 @@ Stream &Stream::ThenConvolveWithAlgorithm(
   VLOG_CALL(PARAM(input_descriptor), PARAM(input_data),
             PARAM(filter_descriptor), PARAM(filter_data),
             PARAM(convolution_descriptor), PARAM(biases),
-            PARAM(activation_mode), PARAM(output_descriptor), PARAM(output));
+            PARAM(activation_mode), PARAM(output_descriptor), PARAM(output),
+            PARAM(algorithm_config));
 
   if (ok()) {
     if (dnn::DnnSupport *dnn = parent_->AsDnn()) {
@@ -502,7 +520,8 @@ Stream &Stream::ThenConvolveWithAlgorithm(
   VLOG_CALL(PARAM(input_descriptor), PARAM(input_data),
             PARAM(filter_descriptor), PARAM(filter_data),
             PARAM(convolution_descriptor), PARAM(biases),
-            PARAM(activation_mode), PARAM(output_descriptor), PARAM(output));
+            PARAM(activation_mode), PARAM(output_descriptor), PARAM(output),
+            PARAM(algorithm_config));
 
   if (ok()) {
     if (dnn::DnnSupport *dnn = parent_->AsDnn()) {
@@ -533,7 +552,7 @@ Stream &Stream::ThenConvolveWithAlgorithm(
   VLOG_CALL(PARAM(input_descriptor), PARAM(input_data),
             PARAM(filter_descriptor), PARAM(filter_data),
             PARAM(convolution_descriptor), PARAM(output_descriptor),
-            PARAM(output));
+            PARAM(output), PARAM(algorithm_config));
 
   if (ok()) {
     if (dnn::DnnSupport *dnn = parent_->AsDnn()) {
@@ -564,7 +583,7 @@ Stream &Stream::ThenConvolveWithAlgorithm(
   VLOG_CALL(PARAM(input_descriptor), PARAM(input_data),
             PARAM(filter_descriptor), PARAM(filter_data),
             PARAM(convolution_descriptor), PARAM(output_descriptor),
-            PARAM(output));
+            PARAM(output), PARAM(algorithm_config));
 
   if (ok()) {
     if (dnn::DnnSupport *dnn = parent_->AsDnn()) {
@@ -4390,15 +4409,19 @@ Stream &Stream::ThenRnnBackward(
 }
 
 Stream &Stream::ThenTransformTensor(const dnn::BatchDescriptor &input_desc,
-                                    const DeviceMemory<float> &input_data,
+                                    dnn::DataType input_type,
+                                    const DeviceMemoryBase &input_data,
                                     const dnn::BatchDescriptor &output_desc,
-                                    DeviceMemory<float> *output_data) {
-  VLOG_CALL(PARAM(input_desc), PARAM(input_data), PARAM(output_desc),
+                                    dnn::DataType output_type, float scale,
+                                    DeviceMemoryBase *output_data) {
+  VLOG_CALL(PARAM(input_desc), PARAM(input_type), PARAM(input_data),
+            PARAM(output_desc), PARAM(output_type), PARAM(scale),
             PARAM(output_data));
   if (ok()) {
     if (dnn::DnnSupport *dnn = parent_->AsDnn()) {
-      CheckError(dnn->DoTransformTensor(this, input_desc, input_data,
-                                        output_desc, output_data));
+      CheckError(dnn->DoTransformTensor(this, input_desc, input_type,
+                                        input_data, output_desc, output_type,
+                                        scale, output_data));
     } else {
       SetErrorAndLogNoDnnSupport();
     }

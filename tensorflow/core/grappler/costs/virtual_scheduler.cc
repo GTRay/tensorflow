@@ -57,17 +57,17 @@ Costs CombineCosts(const Costs& left, const Costs& right) {
 
 VirtualScheduler::VirtualScheduler(const GrapplerItem* grappler_item,
                                    const bool use_static_shapes,
-                                   const string& default_device_type,
-                                   Cluster* cluster, VirtualPlacer* placer)
-    :  // TODO(dyoon): Use a better way than FIFO.
+                                   Cluster* cluster)
+    :  // Allow LIFO as well as FIFO. LIFO allows an output node of an node to
+       // follow it in execution, saving addition memory time from having to
+       // write and read. For default cases, use FIFO for performance.
       ready_nodes_(new FIFOManager()),
       graph_costs_(Costs::ZeroCosts()),
       graph_properties_(*grappler_item),
       cluster_(cluster),
       grappler_item_(grappler_item),
       use_static_shapes_(use_static_shapes),
-      default_device_type_(default_device_type),
-      placer_(placer) {
+      placer_(cluster) {
   initialized_ = false;
 }
 
@@ -240,18 +240,14 @@ bool VirtualScheduler::IsPersistentNode(const NodeDef* node) const {
 }
 
 string VirtualScheduler::DeviceName(const NodeDef* node) const {
-  CHECK(!initialized_) << "DeviceName is called after Init().";
-
-  // TODO(dyoon): integrate this part with VirtualPlacer.
-  return node->device().empty() ? "/device:" + default_device_type_ + ":0"
-                                : node->device();
+  return placer_.get_canonical_device_name(*node);
 }
 
 string VirtualScheduler::ChannelDeviceName(const NodeDef* from,
                                            const NodeDef* to) const {
   CHECK(!initialized_) << "ChannelDeviceName is called after Init().";
-
-  return kChannelDevice + ": " + DeviceName(from) + " to " + DeviceName(to);
+  return kChannelDevice + ": from " + DeviceName(from) + " to " +
+         DeviceName(to);
 }
 
 std::pair<const NodeDef*, const NodeDef*> VirtualScheduler::CreateSendRecv(
@@ -314,31 +310,9 @@ std::pair<const NodeDef*, const NodeDef*> VirtualScheduler::CreateSendRecv(
 NodeInfo VirtualScheduler::GetCurrNodeInfo() const {
   const NodeDef* node = ready_nodes_->GetCurrNode();
 
-  // This is for compatibility; we can just use placer_->get_device() for all
-  // cases, once VirtualCluster is properly set up.
+  // Get the device from the placer.
   DeviceProperties device;
-  if (placer_) {
-    device = placer_->get_device(*node);
-  }
-  if (device.type() == "UNKNOWN") {
-    string device_type;
-    int device_id;
-    DeviceNameUtils::ParsedName parsed;
-    if (!node->device().empty() &&
-        DeviceNameUtils::ParseFullName(node_map_.at(node).device_name,
-                                       &parsed)) {
-      device_type = parsed.type;
-      device_id = parsed.id;
-    } else {
-      device_type = default_device_type_;
-      device_id = 0;
-    }
-    if (device_type == "GPU") {
-      device = GetLocalGPUInfo(device_id);
-    } else if (device_type == "CPU") {
-      device = GetLocalCPUInfo();
-    }
-  }
+  device = placer_.get_device(*node);
 
   // Special case for _Send op.
   if (IsSend(*node)) {
@@ -346,8 +320,8 @@ NodeInfo VirtualScheduler::GetCurrNodeInfo() const {
   }
 
   // Construct NodeInfo.
-  const auto& node_state = node_map_.at(node);
   NodeInfo node_info;
+  const auto& node_state = node_map_.at(node);
   node_info.name = node->name();
   node_info.device_name = node_state.device_name;
   auto& op_info = node_info.op_info;
@@ -388,7 +362,7 @@ NodeState& VirtualScheduler::GetNodeStateOrCreateIt(const NodeDef* node) {
     // Initialize output port related data:
     // Assume the size of OutputProperties represents the number of output ports
     // of this node.
-    for (int i = 0; i < node_state.output_properties.size(); ++i) {
+    for (size_t i = 0; i < node_state.output_properties.size(); ++i) {
       node_state.time_no_references[i] = Costs::Duration::max();
       node_state.num_outputs_executed[i] = 0;
       // Populate an empty vector for each port. The caller will add nodes
@@ -589,6 +563,8 @@ Costs VirtualScheduler::Summary() const {
       persisent_ops.insert(node->op());
     }
     int64 max_memory_usage = persistent_memory_usage + state.max_memory_usage;
+    critical_path_costs.estimated_max_memory_per_device[name] =
+        max_memory_usage;
 
     VLOG(1) << "Device = " << name
             << ", num_nodes = " << state.nodes_executed.size()
@@ -603,6 +579,7 @@ Costs VirtualScheduler::Summary() const {
             << " GB, at the end: " << state.memory_usage << " B";
 
     VLOG(1) << "Per-op execution time (and memory usage at peak memory usage):";
+
     // Profile non-persistent op memory usage.
     for (const auto& node_port : state.mem_usage_snapshot_at_peak) {
       const auto* node = node_port.first;
@@ -626,7 +603,6 @@ Costs VirtualScheduler::Summary() const {
                 << (persisent_ops.count(op) > 0 ? ": persistent op)" : ")");
       }
     }
-    VLOG(1) << "Per-op execution time (and memory usage at peak memory usage):";
     if (critical_path_costs.execution_time <= state.GetCurrTime()) {
       critical_path_costs = state.device_costs;
     }
@@ -642,6 +618,43 @@ Costs VirtualScheduler::Summary() const {
   VLOG(1) << "Critical path execution time: "
           << critical_path_costs.execution_time.count();
   return critical_path_costs;
+}
+
+Costs VirtualScheduler::Summary(RunMetadata* metadata) {
+  if (metadata != nullptr) {
+    StepStats* stepstats = metadata->mutable_step_stats();
+    for (const auto& device : device_) {
+      GraphDef* device_partition_graph =
+          metadata->mutable_partition_graphs()->Add();
+      DeviceStepStats* device_stepstats = stepstats->add_dev_stats();
+      device_stepstats->set_device(device.first);
+      for (const auto& node_def : device.second.nodes_executed) {
+        const NodeState& nodestate = node_map_.at(node_def);
+        NodeExecStats* node_stats = device_stepstats->add_node_stats();
+        for (int slot = 0; slot < nodestate.output_properties.size(); slot++) {
+          const auto& properties = nodestate.output_properties[slot];
+          NodeOutput* no = node_stats->add_output();
+          no->set_slot(slot);
+          TensorDescription* tensor_descr = no->mutable_tensor_description();
+          tensor_descr->set_dtype(properties.dtype());
+          *tensor_descr->mutable_shape() = properties.shape();
+        }
+        node_stats->set_timeline_label(node_def->op());
+        node_stats->set_node_name(node_def->name());
+        node_stats->set_op_start_rel_micros(0);
+        node_stats->set_all_start_micros(
+            nodestate.time_scheduled.asMicroSeconds().count());
+        node_stats->set_op_end_rel_micros(
+            nodestate.time_finished.asMicroSeconds().count() -
+            nodestate.time_scheduled.asMicroSeconds().count());
+        node_stats->set_all_end_rel_micros(
+            nodestate.time_finished.asMicroSeconds().count() -
+            nodestate.time_scheduled.asMicroSeconds().count());
+        *device_partition_graph->mutable_node()->Add() = *node_def;
+      }
+    }
+  }
+  return Summary();
 }
 
 }  // end namespace grappler

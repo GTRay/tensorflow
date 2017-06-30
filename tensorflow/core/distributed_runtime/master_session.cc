@@ -28,6 +28,7 @@ limitations under the License.
 #include "tensorflow/core/distributed_runtime/worker_interface.h"
 #include "tensorflow/core/framework/cost_graph.pb.h"
 #include "tensorflow/core/framework/function.pb.h"
+#include "tensorflow/core/framework/node_def.pb.h"
 #include "tensorflow/core/framework/node_def_util.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/graph/graph_partition.h"
@@ -993,8 +994,7 @@ MasterSession::MasterSession(
           << " #remote " << remote_devs_->size();
 
   LOG(INFO) << "Start master session " << handle_
-            << " with config: " << std::endl
-            << session_opts_.config.DebugString();
+            << " with config: " << session_opts_.config.ShortDebugString();
 }
 
 MasterSession::~MasterSession() {
@@ -1165,7 +1165,6 @@ WorkerCacheInterface* MasterSession::get_worker_cache() const {
 Status MasterSession::StartStep(const BuildGraphOptions& opts, int64* count,
                                 ReffedClientGraph** rcg, bool is_partial) {
   const uint64 hash = HashBuildGraphOptions(opts);
-  ReffedClientGraph* to_unref = nullptr;
   {
     mutex_lock l(mu_);
     // Keep track of how many times this subgraph has been executed in
@@ -1196,7 +1195,6 @@ Status MasterSession::StartStep(const BuildGraphOptions& opts, int64* count,
     *rcg = iter->second;
     (*rcg)->Ref();
   }
-  if (to_unref) to_unref->Unref();
   return Status::OK();
 }
 

@@ -29,12 +29,13 @@ py_library(
     ],
     srcs_version = "PY2AND3",
     deps = [
-        "//tensorflow/python:framework",
+        "//tensorflow/python:training",
     ],
 )
 
 tf_py_test(
     name = "cluster_resolver_py_test",
+    size = "small",
     srcs = ["python/training/cluster_resolver_test.py"],
     additional_deps = [
         ":cluster_resolver_py",

@@ -1,4 +1,4 @@
-# tfprof: TensorFlow Profiling Tool
+# tfprof: TensorFlow Profiler and Beyond
 
 ### Features
 
@@ -7,6 +7,11 @@
 * Profile model performance
   * execution time, memory consumption
   * Profile multiple steps.
+* Auto profile and advise.
+  * accelerator utilization check
+  * expensive operation check
+  * operation configuration check
+  * distributed runtime check (Not OSS)
 
 ### Interfaces
 
@@ -53,6 +58,7 @@ See [Options](g3doc/options.md) for detail instructions.
 *  [Profile Time](g3doc/profile_time.md)
 *  [Profile Memory](g3doc/profile_memory.md)
 *  [Profile Model Architecture](g3doc/profile_model_architecture.md)
+*  [Auto Detect and Advise](g3doc/advise.md)
 *  [Options](g3doc/options.md)
 
 ## Demo
@@ -109,7 +115,9 @@ Sigmoid                        152.57MB (85.28%, 0.21%),        96.66ms (23.46%,
 ```
 
 ### Visualize time and memory.
-![CodeTimeline](g3doc/graph_timeline.png)
+<left>
+[CodeTimeline](g3doc/graph_timeline.png)
+</left>
 
 ### Teams
 

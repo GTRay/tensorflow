@@ -166,9 +166,6 @@ Status TuplePointsToAnalysis::PopulateDefinedBuffersAndAliases(
             const ShapeIndex& index,
             const std::vector<const LogicalBuffer*>& pointed_to_buffers) {
           for (const LogicalBuffer* buffer : pointed_to_buffers) {
-            if (buffer_aliases_.count(buffer) == 0) {
-              buffer_aliases_.insert({buffer, std::vector<BufferAlias>()});
-            }
             buffer_aliases_[buffer].emplace_back(instruction.get(), index);
           }
         });
@@ -238,12 +235,11 @@ Status TuplePointsToAnalysis::HandleGetTupleElement(
   return Status::OK();
 }
 
-Status TuplePointsToAnalysis::HandleCopy(HloInstruction* copy,
-                                         HloInstruction* operand) {
+Status TuplePointsToAnalysis::HandleCopy(HloInstruction* copy) {
   // A kCopy instruction performs a shallow copy of the operand. The top-level
   // buffer (index={}) is newly created, but all other buffers (in the case of a
   // tuple shape) come from the operand
-  PointsToSet& points_to_set = CreateCopiedPointsToSet(copy, operand);
+  PointsToSet& points_to_set = CreateCopiedPointsToSet(copy, copy->operand(0));
   points_to_set.mutable_element(/*index=*/{})->clear();
   points_to_set.AddPointedToBuffer(NewLogicalBuffer(copy, /*index=*/{}),
                                    /*index=*/{});
@@ -338,9 +334,11 @@ const PointsToSet& TuplePointsToAnalysis::GetPointsToSet(
 
 PointsToSet& TuplePointsToAnalysis::CreateEmptyPointsToSet(
     const HloInstruction* instruction) {
-  CHECK_EQ(0, points_to_.count(instruction));
-  points_to_[instruction] = MakeUnique<PointsToSet>(instruction->shape());
-  return *FindOrDie(points_to_, instruction);
+  auto set = MakeUnique<PointsToSet>(&instruction->shape());
+  auto res = points_to_.emplace(instruction, std::move(set));
+  CHECK(res.second) << "instruction should not have been present in the map.";
+  // Return *set using the iterator returned by emplace.
+  return *res.first->second;
 }
 
 bool TuplePointsToAnalysis::InstructionDefinesBufferAtIndex(

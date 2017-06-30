@@ -56,21 +56,41 @@ class TFStats {
           std::unique_ptr<checkpoint::CheckpointReader> ckpt_reader);
   ~TFStats() {}
 
+  const std::map<string, std::unique_ptr<TFGraphNode>>& nodes() const {
+    return nodes_map_;
+  }
+  const std::set<int64>& steps() const { return steps_; }
+  bool has_code_traces() const { return has_code_traces_; }
+
+  void BuildView(const string& cmd);
+  void BuildAllViews();
+
+  // Note: Must first BuildView(view_foo) before ShowXXX(view_foo) methods.
+  //
   // Organize the TensorFlow model as different types of views, and generate
   // outputs for profiling.
-  const TFGraphNodeProto& ShowGraphNode(const string& cmd, const Options& opts);
+  // TODO(xpan): Should it return reference here?
+  const TFGraphNodeProto& ShowGraphNode(const string& cmd,
+                                        const Options& opts) const;
   const TFMultiGraphNodeProto& ShowMultiGraphNode(const string& cmd,
-                                                  const Options& opts);
+                                                  const Options& opts) const;
 
-  void ParseRunMeta(int64 step, std::unique_ptr<RunMetadata> run_meta);
-  void ParseOpLog(std::unique_ptr<OpLog> op_log);
+  // Add a step of run time meta data.
+  void AddRunMeta(int64 step, std::unique_ptr<RunMetadata> run_meta);
+  // Add tfprof operation meta data, such as customized op type, float_ops,
+  // and code traces.
+  void AddOpLog(std::unique_ptr<OpLog> op_log);
+
+  // For test purpose only.
+  void AddNodeForTest(int64 step, std::unique_ptr<TFGraphNode> node);
 
  private:
-  bool Validate(const Options& opts);
+  bool Validate(const Options& opts) const;
 
   void ParseGraph();
 
   std::set<int64> steps_;
+  bool has_code_traces_;
   std::unique_ptr<GraphDef> graph_;
   std::unique_ptr<TFScope> scope_view_;
   std::unique_ptr<TFGraph> graph_view_;
