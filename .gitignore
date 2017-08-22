@@ -15,3 +15,5 @@ node_modules
 __pycache__
 *.swp
 .vscode/
+tensorflow/examples/udacity/1_notmnist.ipynb
+tensorflow/examples/udacity/2_fullyconnected.ipynb
