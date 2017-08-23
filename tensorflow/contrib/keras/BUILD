@@ -19,6 +19,7 @@ py_library(
         "api/keras/activations/__init__.py",
         "api/keras/applications/__init__.py",
         "api/keras/applications/inception_v3/__init__.py",
+        "api/keras/applications/mobilenet/__init__.py",
         "api/keras/applications/resnet50/__init__.py",
         "api/keras/applications/vgg16/__init__.py",
         "api/keras/applications/vgg19/__init__.py",
@@ -156,6 +157,8 @@ py_test(
     deps = [
         ":keras",
         "//tensorflow/python:client_testlib",
+        "//tensorflow/python:layers",
+        "//tensorflow/python:nn",
         "//third_party/py/numpy",
     ],
 )
@@ -217,6 +220,7 @@ py_test(
     deps = [
         ":keras",
         "//tensorflow/python:client_testlib",
+        "//tensorflow/python:training",
         "//third_party/py/numpy",
     ],
 )
@@ -326,6 +330,7 @@ py_test(
     name = "convolutional_recurrent_test",
     size = "medium",
     srcs = ["python/keras/layers/convolutional_recurrent_test.py"],
+    shard_count = 2,
     srcs_version = "PY2AND3",
     tags = ["noasan"],  # times out b/63678675
     deps = [
@@ -522,6 +527,7 @@ py_test(
     deps = [
         ":keras",
         "//tensorflow/python:client_testlib",
+        "//third_party/py/numpy",
     ],
 )
 
@@ -544,6 +550,7 @@ py_test(
     deps = [
         ":keras",
         "//tensorflow/python:client_testlib",
+        "//third_party/py/numpy",
     ],
 )
 
